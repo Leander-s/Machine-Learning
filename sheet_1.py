@@ -47,8 +47,8 @@ def information_gain(X, y, idx):
 
 
 class ID3Tree:
-    def __init__(self) -> None:
-        self.root = Node()
+    def __init__(self, X, y) -> None:
+        self.root = Node(Node.select_best_attribute(X, y))
 
     def train(self, X, y) -> None:
         # recursively run node train
@@ -64,8 +64,9 @@ class ID3Tree:
 
 
 class Node:
-    def __init__(self) -> None:
+    def __init__(self, attribute) -> None:
         self.leaf = False
+        self.attribute = attribute
 
     def train(self, X, y) -> None:
         # check if data is "pure"
