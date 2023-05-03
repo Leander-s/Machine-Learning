@@ -2,8 +2,6 @@ import numpy as np
 import pandas as pd
 from math import log2
 
-# test
-
 
 def load_data(path):
     """
