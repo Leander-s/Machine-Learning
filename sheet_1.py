@@ -64,8 +64,10 @@ class ID3Tree:
 
 
 class Node:
-    def __init__(self, attribute) -> None:
+    def __init__(self, attribute, label) -> None:
         self.leaf = False
+        self.label = label
+        self.finalLabel = None
         self.attribute = attribute
 
     def train(self, X, y) -> None:
@@ -75,7 +77,28 @@ class Node:
         # create new subsets of X
         # check if some of the new nodes are leaves
         # train the new nodes on each subset
-        pass
+        if entropy(y) == 0:
+            self.leaf = True
+            self.finalLabel = y[0]
+            return
+        bestAttribute = Node.select_best_attribute(X, y)
+        leftData = []
+        rightData = []
+        for i in range(len(y)):
+            if X[i][bestAttribute] == 1:
+                rightData.append(X[i])
+            else:
+                leftData.append(X[i])
+        leftData = np.array(leftData)
+        rightData = np.array(rightData)
+
+        right_y = rightData[:, 0]
+        left_y = leftData[:, 0]
+
+        self.rightChild = Node(bestAttribute, 1)
+        self.leftChild = Node(bestAttribute, 0)
+        self.rightChild.train(rightData, right_y)
+        self.leftChild.train(leftData, left_y)
 
     def predict(self, X) -> None:
         pass
