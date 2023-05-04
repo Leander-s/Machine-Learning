@@ -36,9 +36,10 @@ def information_gain(X, y, idx):
     for entry, res in zip(X, y):
         if entry[idx] == 0:
             negCases.append(res)
-        else:
+        elif entry[idx] == 1:
             posCases.append(res)
-
+        else:
+            return -1
     return (
         entropy(y)
         - len(posCases) / len(y) * entropy(posCases)
@@ -89,11 +90,7 @@ class Node:
             self.leaf = True
             self.finalLabel = y[0]
             return
-
-        best_attribute = Node.select_best_attribute(X, y)
-        self.child_attribute = best_attribute
-
-        if best_attribute in self.used_attributes:
+        if len(self.used_attributes) == len(X[0]):
             self.leaf = True
             ones = 0
             zeros = 0
@@ -108,8 +105,32 @@ class Node:
             else:
                 self.finalLabel = 0
             return
-        else:
-            self.used_attributes.append(best_attribute)
+
+        best_attribute = Node.select_best_attribute(X, y)
+
+        x_copy = X.copy()
+        while best_attribute in self.used_attributes:
+            x_copy[:, best_attribute] = -1
+            best_attribute = Node.select_best_attribute(x_copy, y)
+
+        if information_gain(X, y, best_attribute) == 0:
+            self.leaf = True
+            ones = 0
+            zeros = 0
+            for label in y:
+                if label == 1:
+                    ones += 1
+                else:
+                    zeros += 1
+
+            if ones > zeros:
+                self.finalLabel = 1
+            else:
+                self.finalLabel = 0
+            return
+
+        self.child_attribute = best_attribute
+        self.used_attributes.append(best_attribute)
 
         leftData = []
         rightData = []
@@ -132,6 +153,13 @@ class Node:
         self.leftChild = Node(0, best_attribute, self.used_attributes)
         self.rightChild.train(rightData, right_y)
         self.leftChild.train(leftData, left_y)
+
+        if self.leftChild.leaf and self.rightChild.leaf:
+            if self.leftChild.finalLabel == self.rightChild.finalLabel:
+                self.finalLabel = self.leftChild.finalLabel
+                self.leaf = True
+                del self.leftChild
+                del self.rightChild
 
     def predict(self, X) -> None:
         if self.leaf:
@@ -158,11 +186,12 @@ class Node:
         self.rightChild.print()
 
     def select_best_attribute(X, y):
-        bestAttribute = 1
-        bestGain = 0
-        for i in range(1, len(X[0])):
+        bestAttribute = -1
+        bestGain = -1
+        for i in range(0, len(X[0])):
             gain = information_gain(X, y, i)
             if gain > bestGain:
+                bestGain = gain
                 bestAttribute = i
 
         return bestAttribute
@@ -182,4 +211,4 @@ if __name__ == "__main__":
         if res == val:
             correct += 1
 
-    print(f"Accuracy = {correct/len(test) * 100}%")
+    print(f"Accuracy = {int(round(correct/len(test) * 100, 0))}%")
