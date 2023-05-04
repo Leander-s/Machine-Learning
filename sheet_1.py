@@ -68,12 +68,11 @@ class ID3Tree:
 
 
 class Node:
-    def __init__(self, label=None, attribute=None, used_attributes=[]) -> None:
+    def __init__(self, label=None, attribute=None) -> None:
         self.leaf = False
         self.attribute = attribute
         self.child_attribute = None
         self.label = label
-        self.used_attributes = used_attributes
         self.root = False
         if label == None:
             self.root = True
@@ -86,33 +85,17 @@ class Node:
         # create new subsets of X
         # check if some of the new nodes are leaves
         # train the new nodes on each subset
+
+        # if entropy is 0 all the data will result in either 1 or 0 so we can immediatly make a leaf
         if entropy(y) == 0:
             self.leaf = True
             self.finalLabel = y[0]
             return
-        if len(self.used_attributes) == len(X[0]):
-            self.leaf = True
-            ones = 0
-            zeros = 0
-            for label in y:
-                if label == 1:
-                    ones += 1
-                else:
-                    zeros += 1
 
-            if ones > zeros:
-                self.finalLabel = 1
-            else:
-                self.finalLabel = 0
-            return
-
+        # look for the best attribute to get the highest information gain
         best_attribute = Node.select_best_attribute(X, y)
 
-        x_copy = X.copy()
-        while best_attribute in self.used_attributes:
-            x_copy[:, best_attribute] = -1
-            best_attribute = Node.select_best_attribute(x_copy, y)
-
+        # if the information gained from the best attribute is still 0, we can just make a leaf now
         if information_gain(X, y, best_attribute) == 0:
             self.leaf = True
             ones = 0
@@ -120,22 +103,24 @@ class Node:
             for label in y:
                 if label == 1:
                     ones += 1
-                else:
+                elif label == 0:
                     zeros += 1
 
-            if ones > zeros:
+            if ones >= zeros:
                 self.finalLabel = 1
             else:
                 self.finalLabel = 0
             return
 
         self.child_attribute = best_attribute
-        self.used_attributes.append(best_attribute)
 
+        # we create two children, a right child and a left child
+        # for that we gather the data to train them
         leftData = []
         rightData = []
         left_y = []
         right_y = []
+        # for every example we have we check if the attribute is 1 or 0 and categorize the example accordingly
         for i in range(len(y)):
             if X[i][best_attribute] == 1:
                 rightData.append(X[i])
@@ -143,17 +128,19 @@ class Node:
             else:
                 leftData.append(X[i])
                 left_y.append(y[i])
+
         leftData = np.array(leftData)
         rightData = np.array(rightData)
-
         right_y = np.array(right_y)
         left_y = np.array(left_y)
 
-        self.rightChild = Node(1, best_attribute, self.used_attributes)
-        self.leftChild = Node(0, best_attribute, self.used_attributes)
+        # we create and train the children using the ordered data
+        self.rightChild = Node(1, best_attribute)
+        self.leftChild = Node(0, best_attribute)
         self.rightChild.train(rightData, right_y)
         self.leftChild.train(leftData, left_y)
 
+        # if both children are leafs with the same label they are redundant and we can use this node as a leaf with that label
         if self.leftChild.leaf and self.rightChild.leaf:
             if self.leftChild.finalLabel == self.rightChild.finalLabel:
                 self.finalLabel = self.leftChild.finalLabel
@@ -162,8 +149,10 @@ class Node:
                 del self.rightChild
 
     def predict(self, X) -> None:
+        # if the node is leaf, the prediction is its finalLabel
         if self.leaf:
             return self.finalLabel
+        # if not, its the child nodes prediction. Either left or right child, depending on the value of the child attribute
         if X[self.child_attribute] == 0:
             return self.leftChild.predict(X)
         else:
