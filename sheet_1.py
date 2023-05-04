@@ -13,9 +13,9 @@ def load_data(path):
     Returns:
         X, y (tuple): A data matrix and a label vector
     """
-    data = pd.read_csv(path, header=None)
-    X = data.values
-    y = data.iloc[:, 0].values
+    data = pd.read_csv(path, header=None).to_numpy()
+    X = data[:, 1:]
+    y = data[:, 0]
     return X, y
 
 
@@ -33,11 +33,11 @@ def entropy(y):
 def information_gain(X, y, idx):
     posCases = []
     negCases = []
-    for entry in X:
+    for entry, res in zip(X, y):
         if entry[idx] == 0:
-            negCases.append(entry[0])
+            negCases.append(res)
         else:
-            posCases.append(entry[0])
+            posCases.append(res)
 
     return (
         entropy(y)
@@ -47,28 +47,36 @@ def information_gain(X, y, idx):
 
 
 class ID3Tree:
-    def __init__(self, X, y) -> None:
-        self.root = Node(Node.select_best_attribute(X, y))
+    def __init__(self) -> None:
+        self.root = Node()
 
     def train(self, X, y) -> None:
         # recursively run node train
-        pass
+        self.root.train(X, y)
 
     def predict(self, X) -> None:
         # recursively run node predict
-        pass
+        result = []
+        for entry in X:
+            result.append(self.root.predict(entry))
+        return np.array(result)
 
     def print(self):
         # recursively run node print
-        pass
+        self.root.print()
 
 
 class Node:
-    def __init__(self, attribute, label) -> None:
+    def __init__(self, label=None, attribute=None, used_attributes=[]) -> None:
         self.leaf = False
-        self.label = label
-        self.finalLabel = None
         self.attribute = attribute
+        self.child_attribute = None
+        self.label = label
+        self.used_attributes = used_attributes
+        self.root = False
+        if label == None:
+            self.root = True
+        self.finalLabel = None
 
     def train(self, X, y) -> None:
         # check if data is "pure"
@@ -81,30 +89,73 @@ class Node:
             self.leaf = True
             self.finalLabel = y[0]
             return
-        bestAttribute = Node.select_best_attribute(X, y)
+
+        best_attribute = Node.select_best_attribute(X, y)
+        self.child_attribute = best_attribute
+
+        if best_attribute in self.used_attributes:
+            self.leaf = True
+            ones = 0
+            zeros = 0
+            for label in y:
+                if label == 1:
+                    ones += 1
+                else:
+                    zeros += 1
+
+            if ones > zeros:
+                self.finalLabel = 1
+            else:
+                self.finalLabel = 0
+            return
+        else:
+            self.used_attributes.append(best_attribute)
+
         leftData = []
         rightData = []
+        left_y = []
+        right_y = []
         for i in range(len(y)):
-            if X[i][bestAttribute] == 1:
+            if X[i][best_attribute] == 1:
                 rightData.append(X[i])
+                right_y.append(y[i])
             else:
                 leftData.append(X[i])
+                left_y.append(y[i])
         leftData = np.array(leftData)
         rightData = np.array(rightData)
 
-        right_y = rightData[:, 0]
-        left_y = leftData[:, 0]
+        right_y = np.array(right_y)
+        left_y = np.array(left_y)
 
-        self.rightChild = Node(bestAttribute, 1)
-        self.leftChild = Node(bestAttribute, 0)
+        self.rightChild = Node(1, best_attribute, self.used_attributes)
+        self.leftChild = Node(0, best_attribute, self.used_attributes)
         self.rightChild.train(rightData, right_y)
         self.leftChild.train(leftData, left_y)
 
     def predict(self, X) -> None:
-        pass
+        if self.leaf:
+            return self.finalLabel
+        if X[self.child_attribute] == 0:
+            return self.leftChild.predict(X)
+        else:
+            return self.rightChild.predict(X)
 
     def print(self):
-        pass
+        if self.root:
+            print("Root")
+        else:
+            if self.leaf == True:
+                print(
+                    f"Attribute : {self.attribute} | Label : {self.label} | Leaf : {self.leaf} | Final : {self.finalLabel}"
+                )
+                return
+            else:
+                print(
+                    f"Attribute : {self.attribute} | Label : {self.label} | Child : {self.child_attribute}"
+                )
+        self.leftChild.print()
+        self.rightChild.print()
 
     def select_best_attribute(X, y):
         bestAttribute = 1
@@ -120,6 +171,15 @@ class Node:
 if __name__ == "__main__":
     train_data = load_data("SPECT.train")
     test_data = load_data("SPECT.test")
-    print(Node.select_best_attribute(train_data[0], train_data[1]))
-    print(information_gain(train_data[0], train_data[1], 22))
-    pass
+
+    tree = ID3Tree()
+    tree.train(train_data[0], train_data[1])
+    tree.print()
+    test = tree.predict(test_data[0])
+
+    correct = 0
+    for res, val in zip(test, test_data[1]):
+        if res == val:
+            correct += 1
+
+    print(f"Accuracy = {correct/len(test) * 100}%")
